@@ -24,7 +24,7 @@ const ConfirmationPage: React.FC = () => {
                 <MapPin size={20} className="text-[#1351B4]" />
                 Confirmação da Região
               </div>
-              <p className="text-gray-600">vagas disponíveis</p>
+              <p className="text-gray-600">Vagas disponíveis</p>
             </div>
           </div>
 
