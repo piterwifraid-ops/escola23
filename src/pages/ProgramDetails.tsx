@@ -24,7 +24,7 @@ const ProgramDetails: React.FC = () => {
 			title: "Confirmação da Região",
 			subtitle: "Verificando região...",
 			icon: MapPin,
-			value: "vagas disponíveis",
+			value: "Vagas disponíveis",
 		},
 		{
 			id: "salary",
