@@ -10,7 +10,7 @@ const SuccessPage: React.FC = () => {
 	const getFutureDate = () => {
 		const date = new Date();
 		date.setDate(date.getDate() + 1);
-		return date.getDate() + " de julho";
+		return date.getDate() + " de Janeiro";
 	};
 
 	return (
