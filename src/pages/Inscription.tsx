@@ -207,8 +207,7 @@ const Inscription: React.FC = () => {
 	const [isVerifying, setIsVerifying] = useState(false);
 	const [verificationComplete, setVerificationComplete] = useState(false);
 	const [name, setName] = useState("");
-	const [email, setEmail] = useState("");
-	const [phone, setPhone] = useState("");
+
 	const { setLocationInfo } = useLocation();
 	const { setUserName } = useUser();
 
@@ -251,13 +250,7 @@ const Inscription: React.FC = () => {
 		return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
 	};
 
-	const formatPhone = (value: string) => {
-		const numbers = value.replace(/\D/g, "");
-		if (numbers.length <= 2) return `(${numbers}`;
-		if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-		if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
-		return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
-	};
+
 
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
@@ -593,46 +586,7 @@ const Inscription: React.FC = () => {
 												/>
 											</div>
 
-											<div>
-												<label className="block text-sm font-medium text-gray-700 mb-1">
-													Email
-												</label>
-												<input
-													type="email"
-													value={email}
-													onChange={(e) => setEmail(e.target.value)}
-													placeholder="Digite seu email"
-													className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1351B4] focus:border-transparent"
-												/>
-												<p className="text-sm text-gray-500 mt-1">
-													Usaremos este email para enviar informações importantes sobre sua
-													inscrição
-												</p>
-											</div>
-
-											<div>
-												<label className="block text-sm font-medium text-gray-700 mb-1">
-													Telefone
-												</label>
-												<input
-													type="tel"
-													inputMode="numeric"
-													pattern="\d*"
-													placeholder="(00) 00000-0000"
-													value={phone}
-													onChange={(e) => {
-														const formatted = formatPhone(e.target.value);
-														if (formatted.length <= 15) {
-															setPhone(formatted);
-														}
-													}}
-													className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1351B4] focus:border-transparent"
-													maxLength={15}
-												/>
-												<p className="text-sm text-gray-500 mt-1">
-													Usaremos este telefone para entrar em contato caso necessário
-												</p>
-											</div>
+                                            
 
 											<div className="flex items-start gap-2 mt-6">
 												<input
