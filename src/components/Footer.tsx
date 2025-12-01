@@ -22,7 +22,7 @@ const Footer: React.FC = () => {
 
   return (
     <footer>
-      <div className="bg-gray-800 text-white py-6">
+      <div className="text-white py-6" style={{ backgroundColor: '#001a33' }}>
         <div className="container mx-auto px-4">
           <div className="py-3">
             <img 
@@ -179,7 +179,7 @@ const Footer: React.FC = () => {
         </div>
       </div>
       
-      <div className="bg-gray-900 py-3">
+      <div className="py-3" style={{ backgroundColor: '#001a33' }}>
         <div className="container mx-auto px-4">
           <div className="text-xs text-white">
             Todo o conteúdo deste site está publicado sob a licença{' '}
