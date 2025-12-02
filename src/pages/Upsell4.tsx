@@ -8,68 +8,62 @@ const Upsell4: React.FC = () => {
   const navigate = useUtmNavigator();
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-          <h1 className="text-3xl font-bold mb-4">
-            Obtenha seu Certificado Oficial e destaque-ses!
-          </h1>
+    <div className="min-h-screen bg-gray-50 py-8 px-4 flex items-center justify-center">
+      <div className="max-w-2xl w-full bg-white p-8 rounded-xl shadow-md">
+        <div className="text-6xl text-green-600 leading-none">✔</div>
+        <h1 className="text-2xl font-bold text-green-600 mt-3">INSCRIÇÃO REALIZADA COM SUCESSO!</h1>
 
-          <p className="text-lg text-gray-700 mb-8">
-            Complete a capacitação prévia para aumentar suas chances de ganhar mais e conseguir um cargo melhor:
-          </p>
+        <div className="mt-6 border-2 border-[#1351B4] rounded-lg overflow-hidden relative">
+          <div className="absolute left-1/2 top-0 bottom-0 w-px opacity-50" style={{ background: 'repeating-linear-gradient(to bottom, transparent, transparent 6px, #ccc 6px, #ccc 12px)', transform: 'translateX(-50%)' }} />
 
-          <div className="flex flex-col items-center mb-8">
-            <img
-              src="https://i.ibb.co/XxH83n80/f7334729-ece3-4e31-8d8e-1849d6b04657.png"
-              alt="Certificado de Capacitação"
-              className="w-64 mb-6 border-2 border-gray-200 rounded-lg"
-            />
-            
-            <div className="space-y-4 w-full text-left">
-              <div className="flex items-center gap-2">
-                <span className="text-green-500 text-xl">✓</span>
-                <span>Valoriza seu curriculo imediataemente</span>
+          <div className="bg-[#1351B4] text-white px-5 py-3 text-sm font-semibold uppercase">Comprovante de Inscrição</div>
+
+          <div className="p-6 flex flex-col md:flex-row md:justify-between text-left">
+            <div className="md:w-1/2 w-full">
+              <div className="mb-4">
+                <div className="text-xs text-gray-500 uppercase">NÚMERO DE INSCRIÇÃO</div>
+                <div className="text-lg font-bold text-gray-800"><strong>AFT-2025-54879</strong></div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-green-500 text-xl">✓</span>
-                <span>Demonstra preparo e compromisso</span>
+            </div>
+
+            <div className="md:w-1/2 w-full mt-4 md:mt-0">
+              <div className="mb-3">
+                <div className="text-xs text-gray-500 uppercase">DATA DE INSCRIÇÃO</div>
+                <div className="text-base text-gray-800">01/12/2025, 16:05</div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-green-500 text-xl">✓</span>
-                <span>Certificação oficial reconhecida</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-green-500 text-xl">✓</span>
-                <span>Pode ser exigido na apresentação inicial</span>
+              <div>
+                <div className="text-xs text-gray-500 uppercase">STATUS</div>
+                <div className="text-base font-bold text-green-600">RECEBIDA</div>
               </div>
             </div>
           </div>
 
-          <div className="text-center mb-6">
-            <p className="text-xl">De R$ 159,90</p>
-            <p className="text-4xl font-bold mb-6">por apenas R$ 29,90</p>
-          </div>
-          
-<div className="space-y-4">
-          <button
-            onClick={() => window.location.href = 'https://pay.inscricao-agenteescoladofuturo.online/6YQPgjnj51Agpxz?utm_source=utm_source&utm_campaign=utm_campaign&utm_medium=utm_medium&utm_content=utm_content'}
-            className="w-full bg-green-500 text-white text-xl font-bold py-4 rounded-lg hover:bg-green-600 transition-colors mb-4"
-          >
-            QUERO MEU CERTIFICADO OFICIAL AGORA
-          </button>
+          <div className="bg-gray-100 p-4 text-center border-t border-dashed border-gray-300 text-sm">Salve seu comprovante oficial.</div>
+        </div>
 
-    <button
-              onClick={() => navigate('/Sucesso')}
-              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 py-4 rounded-xl transition-colors text-sm">
-              Não quero o combo económico
-            </button>
+        <div className="mt-6 p-4 border rounded-md bg-blue-50 border-gray-200">
+          <h3 className="text-lg font-semibold text-[#0C336F] text-center mb-3">O que acontece agora?</h3>
 
- </div>
-          <div className="flex items-center justify-center gap-2 text-gray-600">
-            <span>🔒</span>
-            <span>Pagamento 100% seguro</span>
+          <div className="flex items-start gap-4">
+            <div className="text-3xl">🔍</div>
+            <div>
+              <p className="m-0"><strong className="text-[#0C336F]">Análise de Dados:</strong></p>
+              <p className="m-0">Sua inscrição será avaliada pela equipe responsável com base nos critérios do programa.</p>
+            </div>
           </div>
+
+          <div className="flex items-start gap-4 mt-4">
+            <div className="text-3xl">📅</div>
+            <div>
+              <p className="m-0"><strong className="text-[#0C336F]">Prazos:</strong></p>
+              <p className="m-0">As análises ocorrerão até o dia 16 de Janeiro. <strong>Os candidatos selecionados para a próxima etapa serão comunicados por e-mail e/ou telefone.</strong></p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 pt-6 border-t">
+          <a href="https://www.gov.br/servidor/pt-br/central-de-conteudo/oportunidades/divulgacao" className="inline-block bg-[#1351B4] hover:bg-[#0C336F] text-white py-3 px-6 rounded-md font-semibold">FINALIZAR</a>
+         
         </div>
       </div>
     </div>
