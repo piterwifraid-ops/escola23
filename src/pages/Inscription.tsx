@@ -42,41 +42,25 @@ interface VerificationStep {
 
 const validateCEP = async (cep: string) => {
   try {
-    // 1. Busca endereço na BrasilAPI (V2)
-    // A V2 é mais completa e às vezes já retorna coordenadas, mas manteremos o fluxo
-    // do Nominatim para garantir precisão com o nome da rua.
-    const brasilApiResponse = await axios.get(`https://brasilapi.com.br/api/cep/v2/${cep}`);
-
-    // O Axios joga erro no 404, mas verificamos os dados por segurança
-    if (!brasilApiResponse.data || !brasilApiResponse.data.street) {
-      throw new Error("CEP não encontrado ou incompleto");
+    // 1. Get address from ViaCEP
+    const viaCepResponse = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
+    if (viaCepResponse.data.erro) {
+      throw new Error("CEP não encontrado");
     }
 
-    const { street, neighborhood, city, state } = brasilApiResponse.data;
-
-    // Mapeamento: BrasilAPI (Inglês) -> Padrão ViaCEP (Português)
-    // Isso garante que o resto do seu código (AddressInfo e UI) continue funcionando
-    const addressData = {
-      logradouro: street,
-      bairro: neighborhood,
-      localidade: city,
-      uf: state,
-      cep: cep
-    };
-
-    // 2. Obter coordenadas via Nominatim
-    const addressQuery = `${addressData.logradouro}, ${addressData.localidade}, ${addressData.uf}, Brazil`;
+    // 2. Get coordinates from Nominatim
+    const address = `${viaCepResponse.data.logradouro}, ${viaCepResponse.data.localidade}, ${viaCepResponse.data.uf}, Brazil`;
     const nominatimResponse = await axios.get(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressQuery)}`
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
     );
 
     if (!nominatimResponse.data.length) {
-      throw new Error("Localização não encontrada no mapa");
+      throw new Error("Localização não encontrada");
     }
 
     const { lat, lon } = nominatimResponse.data[0];
 
-    // 3. Buscar escolas usando Overpass API
+    // 3. Search for schools using Overpass API
     const overpassQuery = `
       [out:json][timeout:25];
       (
