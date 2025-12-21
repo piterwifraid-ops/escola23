@@ -42,25 +42,47 @@ interface VerificationStep {
 
 const validateCEP = async (cep: string) => {
   try {
-    // 1. Get address from ViaCEP
-    const viaCepResponse = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
-    if (viaCepResponse.data.erro) {
+    // 1. Obter endereço e coordenadas da BrasilAPI (v2)
+    const brasilApiResponse = await axios.get(`https://brasilapi.com.br/api/cep/v2/${cep}`);
+    
+    if (!brasilApiResponse.data || brasilApiResponse.data.errors) {
       throw new Error("CEP não encontrado");
     }
 
-    // 2. Get coordinates from Nominatim
-    const address = `${viaCepResponse.data.logradouro}, ${viaCepResponse.data.localidade}, ${viaCepResponse.data.uf}, Brazil`;
-    const nominatimResponse = await axios.get(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
-    );
+    const { state, city, neighborhood, street, location } = brasilApiResponse.data;
 
-    if (!nominatimResponse.data.length) {
-      throw new Error("Localização não encontrada");
+    // Objeto de endereço mapeado para o formato que seu componente já espera (padrão ViaCEP)
+    const addressData = {
+      logradouro: street,
+      bairro: neighborhood,
+      localidade: city,
+      uf: state,
+      cep: cep
+    };
+
+    let lat: number;
+    let lon: number;
+
+    // 2. Tentar usar coordenadas da BrasilAPI. Se não houver, buscar no Nominatim.
+    if (location && location.coordinates && location.coordinates.latitude) {
+      lat = parseFloat(location.coordinates.latitude);
+      lon = parseFloat(location.coordinates.longitude);
+    } else {
+      // Fallback: Busca coordenadas no Nominatim se a BrasilAPI não retornou
+      const addressString = `${street}, ${city}, ${state}, Brazil`;
+      const nominatimResponse = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressString)}`
+      );
+
+      if (!nominatimResponse.data.length) {
+        throw new Error("Localização não encontrada");
+      }
+
+      lat = parseFloat(nominatimResponse.data[0].lat);
+      lon = parseFloat(nominatimResponse.data[0].lon);
     }
 
-    const { lat, lon } = nominatimResponse.data[0];
-
-    // 3. Search for schools using Overpass API
+    // 3. Buscar escolas usando Overpass API (Lógica mantida)
     const overpassQuery = `
       [out:json][timeout:25];
       (
@@ -83,29 +105,29 @@ const validateCEP = async (cep: string) => {
       }
     );
 
-    // Process schools
+    // Processar escolas
     const schools = overpassResponse.data.elements
-      .filter(element => element.tags && element.tags.name)
-      .map(element => ({
+      .filter((element: any) => element.tags && element.tags.name)
+      .map((element: any) => ({
         id: element.id.toString(),
         name: element.tags.name,
         type: element.tags.school_type || 'Escola pública',
-        distance: calculateDistance(lat, lon, element.lat, element.lon)
+        distance: calculateDistance(lat, lon, element.lat || lat, element.lon || lon) // Fallback seguro para lat/lon
       }))
-      .sort((a, b) => a.distance - b.distance)
+      .sort((a: School, b: School) => a.distance - b.distance)
       .slice(0, 3);
 
     return {
-      address: viaCepResponse.data,
+      address: addressData,
       schools,
       coordinates: { lat, lon }
     };
+
   } catch (error) {
     console.error('Error fetching location data:', error);
     throw error;
   }
 };
-
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371; // Earth's radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -148,34 +170,41 @@ const validateCPFFromAPI = async (cpf: string): Promise<{ valid: boolean; data?:
 	}
 
 	try {
-		// Consultar nova API de CPF (Magmadatahub). Substitui o endpoint anterior.
+		// Consultar nova API de CPF (magmadatahub)
+		// A resposta esperada contém: cpf, nome, sexo, nascimento (dd/mm/YYYY), nome_mae
 		const response = await axios.get(
 			`https://magmadatahub.com/api.php?token=bef7dbfe0994308f734fbfb4e2a0dec17aa7baed9f53a0f5dd700cf501f39f26&cpf=${numericCPF}`
 		);
 
-		// A API pode retornar estruturas diferentes dependendo do provedor.
-		// Normalizamos os campos mais comuns para manter compatibilidade.
-		const respData = response.data || {};
+		if (response.data && response.data.cpf) {
+			// Converter data de nascimento de dd/mm/YYYY para YYYY-MM-DD para garantir compatibilidade com new Date()
+			let isoDate = "";
+			if (response.data.nascimento) {
+				const parts = String(response.data.nascimento).split("/");
+				if (parts.length === 3) {
+					isoDate = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+				} else {
+					isoDate = response.data.nascimento;
+				}
+			}
 
-		// Preferência por campo DADOS (compatibilidade antiga), senão tentamos vários caminhos possíveis
-		const payload = respData.DADOS || respData.data || respData.result || respData;
+			// Normalizar sexo para 'M' ou 'F'
+			let sexoNormalized = "";
+			if (response.data.sexo) {
+				const s = String(response.data.sexo).toLowerCase();
+				if (s.startsWith("m")) sexoNormalized = "M";
+				else sexoNormalized = "F";
+			}
 
-		const resolvedCpf = payload?.cpf || payload?.document || payload?.document_number || payload?.documentNumber;
-		const resolvedName = payload?.nome || payload?.name || payload?.full_name || payload?.nome_completo || payload?.nomeCompleto;
-		const resolvedNomeMae = payload?.nome_mae || payload?.mother_name || payload?.nomeMae;
-		const resolvedBirth = payload?.data_nascimento || payload?.birthdate || payload?.nascimento;
-		const resolvedSexo = payload?.sexo || payload?.sex || payload?.genero;
-
-		if (resolvedName) {
 			return {
 				valid: true,
 				data: {
-					cpf: resolvedCpf || numericCPF,
-					nome: resolvedName,
-					nome_mae: resolvedNomeMae || "",
-					data_nascimento: resolvedBirth || "",
-					sexo: resolvedSexo || "",
-				},
+					cpf: response.data.cpf,
+					nome: response.data.nome || "",
+					nome_mae: response.data.nome_mae || "",
+					data_nascimento: isoDate,
+					sexo: sexoNormalized
+				}
 			};
 		}
 	} catch (error) {
@@ -380,6 +409,8 @@ const Inscription: React.FC = () => {
 				setUserInfo(result.data);
 				setName(result.data.nome);
 				setUserName(result.data.nome);
+				// Marcar automaticamente aceitação dos termos quando o CPF for validado com dados
+				setAcceptedTerms(true);
 			}
 		} catch (err) {
 			setError("CPF inválido. Por favor, verifique o número e tente novamente.");
@@ -561,17 +592,7 @@ const Inscription: React.FC = () => {
 											</p>
 										</div>
 
-										{userInfo && (
-											<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200">
-												<h3 className="text-green-700 font-bold mb-3">Dados encontrados:</h3>
-												<div className="space-y-2 text-sm">
-													<div><span className="font-medium">Nome:</span> {userInfo.nome}</div>
-													<div><span className="font-medium">Nome da Mãe:</span> {userInfo.nome_mae}</div>
-													<div><span className="font-medium">Data de Nascimento:</span> {formatDate(userInfo.data_nascimento)}</div>
-													<div><span className="font-medium">Sexo:</span> {userInfo.sexo === 'M' ? 'Masculino' : 'Feminino'}</div>
-												</div>
-											</div>
-										)}
+											{/* Dados pessoais não serão exibidos no front-end por requisição do produto */}
 
 										<div className="space-y-6">
 											<div>
