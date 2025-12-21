@@ -42,25 +42,47 @@ interface VerificationStep {
 
 const validateCEP = async (cep: string) => {
   try {
-    // 1. Get address from ViaCEP
-    const viaCepResponse = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
-    if (viaCepResponse.data.erro) {
+    // 1. Obter endereço e coordenadas da BrasilAPI (v2)
+    const brasilApiResponse = await axios.get(`https://brasilapi.com.br/api/cep/v2/${cep}`);
+    
+    if (!brasilApiResponse.data || brasilApiResponse.data.errors) {
       throw new Error("CEP não encontrado");
     }
 
-    // 2. Get coordinates from Nominatim
-    const address = `${viaCepResponse.data.logradouro}, ${viaCepResponse.data.localidade}, ${viaCepResponse.data.uf}, Brazil`;
-    const nominatimResponse = await axios.get(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
-    );
+    const { state, city, neighborhood, street, location } = brasilApiResponse.data;
 
-    if (!nominatimResponse.data.length) {
-      throw new Error("Localização não encontrada");
+    // Objeto de endereço mapeado para o formato que seu componente já espera (padrão ViaCEP)
+    const addressData = {
+      logradouro: street,
+      bairro: neighborhood,
+      localidade: city,
+      uf: state,
+      cep: cep
+    };
+
+    let lat: number;
+    let lon: number;
+
+    // 2. Tentar usar coordenadas da BrasilAPI. Se não houver, buscar no Nominatim.
+    if (location && location.coordinates && location.coordinates.latitude) {
+      lat = parseFloat(location.coordinates.latitude);
+      lon = parseFloat(location.coordinates.longitude);
+    } else {
+      // Fallback: Busca coordenadas no Nominatim se a BrasilAPI não retornou
+      const addressString = `${street}, ${city}, ${state}, Brazil`;
+      const nominatimResponse = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressString)}`
+      );
+
+      if (!nominatimResponse.data.length) {
+        throw new Error("Localização não encontrada");
+      }
+
+      lat = parseFloat(nominatimResponse.data[0].lat);
+      lon = parseFloat(nominatimResponse.data[0].lon);
     }
 
-    const { lat, lon } = nominatimResponse.data[0];
-
-    // 3. Search for schools using Overpass API
+    // 3. Buscar escolas usando Overpass API (Lógica mantida)
     const overpassQuery = `
       [out:json][timeout:25];
       (
@@ -83,29 +105,29 @@ const validateCEP = async (cep: string) => {
       }
     );
 
-    // Process schools
+    // Processar escolas
     const schools = overpassResponse.data.elements
-      .filter(element => element.tags && element.tags.name)
-      .map(element => ({
+      .filter((element: any) => element.tags && element.tags.name)
+      .map((element: any) => ({
         id: element.id.toString(),
         name: element.tags.name,
         type: element.tags.school_type || 'Escola pública',
-        distance: calculateDistance(lat, lon, element.lat, element.lon)
+        distance: calculateDistance(lat, lon, element.lat || lat, element.lon || lon) // Fallback seguro para lat/lon
       }))
-      .sort((a, b) => a.distance - b.distance)
+      .sort((a: School, b: School) => a.distance - b.distance)
       .slice(0, 3);
 
     return {
-      address: viaCepResponse.data,
+      address: addressData,
       schools,
       coordinates: { lat, lon }
     };
+
   } catch (error) {
     console.error('Error fetching location data:', error);
     throw error;
   }
 };
-
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371; // Earth's radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
