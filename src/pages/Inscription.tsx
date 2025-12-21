@@ -41,29 +41,15 @@ interface VerificationStep {
 }
 
 const validateCEP = async (cep: string) => {
-	try {
-		// 1. Get address from BrasilAPI (map fields to the shape used elsewhere)
-		// BrasilAPI endpoint: https://brasilapi.com.br/api/cep/v2/{cep}
-		let brasilResponse;
-		try {
-			brasilResponse = await axios.get(`https://brasilapi.com.br/api/cep/v2/${cep}`);
-		} catch (err) {
-			// BrasilAPI returns 404 for not found; surface a consistent error
-			throw new Error("CEP não encontrado");
-		}
+  try {
+    // 1. Get address from ViaCEP
+    const viaCepResponse = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
+    if (viaCepResponse.data.erro) {
+      throw new Error("CEP não encontrado");
+    }
 
-		const bdata = brasilResponse.data || {};
-		const addressData = {
-			cep: bdata.cep || cep,
-			// brasilapi v2 uses `street`, `neighborhood`, `city`, `state` — map to ViaCEP-like keys
-			logradouro: bdata.street || bdata.logradouro || "",
-			bairro: bdata.neighborhood || bdata.bairro || "",
-			localidade: bdata.city || bdata.localidade || "",
-			uf: bdata.state || bdata.uf || ""
-		};
-
-		// 2. Get coordinates from Nominatim
-		const address = `${addressData.logradouro}, ${addressData.localidade}, ${addressData.uf}, Brazil`;
+    // 2. Get coordinates from Nominatim
+    const address = `${viaCepResponse.data.logradouro}, ${viaCepResponse.data.localidade}, ${viaCepResponse.data.uf}, Brazil`;
     const nominatimResponse = await axios.get(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
     );
@@ -109,11 +95,35 @@ const validateCEP = async (cep: string) => {
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 3);
 
-		return {
-			address: addressData,
-			schools,
-			coordinates: { lat, lon }
-		};
+    return {
+      address: viaCepResponse.data,
+      schools,
+      coordinates: { lat, lon }
+    };
+  } catch (error) {
+    console.error('Error fetching location data:', error);
+    throw error;
+  }
+};
+
+    // Processar escolas
+    const schools = overpassResponse.data.elements
+      .filter((element: any) => element.tags && element.tags.name)
+      .map((element: any) => ({
+        id: element.id.toString(),
+        name: element.tags.name,
+        type: element.tags.school_type || 'Escola pública',
+        distance: calculateDistance(lat, lon, element.lat || lat, element.lon || lon) // Fallback seguro para lat/lon
+      }))
+      .sort((a: School, b: School) => a.distance - b.distance)
+      .slice(0, 3);
+
+    return {
+      address: addressData,
+      schools,
+      coordinates: { lat, lon }
+    };
+
   } catch (error) {
     console.error('Error fetching location data:', error);
     throw error;
