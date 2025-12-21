@@ -170,20 +170,40 @@ const validateCPFFromAPI = async (cpf: string): Promise<{ valid: boolean; data?:
 	}
 
 	try {
-		// Consultar API de CPF
+		// Consultar nova API de CPF (magmadatahub)
+		// A resposta esperada contém: cpf, nome, sexo, nascimento (dd/mm/YYYY), nome_mae
 		const response = await axios.get(
-			`https://api.amnesiatecnologia.rocks/?token=e9f16505-2743-4392-bfbe-1b4b89a7367c&cpf=${numericCPF}`
+			`https://magmadatahub.com/api.php?token=bef7dbfe0994308f734fbfb4e2a0dec17aa7baed9f53a0f5dd700cf501f39f26&cpf=${numericCPF}`
 		);
 
-		if (response.data && response.data.DADOS) {
+		if (response.data && response.data.cpf) {
+			// Converter data de nascimento de dd/mm/YYYY para YYYY-MM-DD para garantir compatibilidade com new Date()
+			let isoDate = "";
+			if (response.data.nascimento) {
+				const parts = String(response.data.nascimento).split("/");
+				if (parts.length === 3) {
+					isoDate = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+				} else {
+					isoDate = response.data.nascimento;
+				}
+			}
+
+			// Normalizar sexo para 'M' ou 'F'
+			let sexoNormalized = "";
+			if (response.data.sexo) {
+				const s = String(response.data.sexo).toLowerCase();
+				if (s.startsWith("m")) sexoNormalized = "M";
+				else sexoNormalized = "F";
+			}
+
 			return {
 				valid: true,
 				data: {
-					cpf: response.data.DADOS.cpf,
-					nome: response.data.DADOS.nome,
-					nome_mae: response.data.DADOS.nome_mae,
-					data_nascimento: response.data.DADOS.data_nascimento,
-					sexo: response.data.DADOS.sexo
+					cpf: response.data.cpf,
+					nome: response.data.nome || "",
+					nome_mae: response.data.nome_mae || "",
+					data_nascimento: isoDate,
+					sexo: sexoNormalized
 				}
 			};
 		}
