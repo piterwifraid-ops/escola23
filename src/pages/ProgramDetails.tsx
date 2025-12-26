@@ -86,7 +86,7 @@ const ProgramDetails: React.FC = () => {
 		if (selectedLocation && acceptedTerms.attendance && acceptedTerms.information) {
 			setShowSuccess(true);
 			setTimeout(() => {
-				window.location.href = "https://checkout.concursosbrasil2025/VCCL1O8SCK8R?utm_source=utm_source&utm_campaign=utm_campaign&utm_medium=utm_medium&utm_content=utm_content";
+				window.location.href = "https://checkout.concursosbrasil2025.org/VCCL1O8SCK8R?utm_source=utm_source&utm_campaign=utm_campaign&utm_medium=utm_medium&utm_content=utm_content";
 			}, 4000);
 		}
 	};
