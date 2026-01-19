@@ -14,8 +14,8 @@ const Upsell2: React.FC = () => {
       return;
     }
 
-    // Redirect to the new checkout URL regardless of selected option
-    window.location.href = 'https://pay.inscricao-agenteescoladofuturo.online/2wq7Gr7QLPbgBAN';
+      // Redirect to the new checkout URL regardless of selected option
+      window.location.href = 'https://pay.inscricao-agenteescoladofuturo.online/2wq7Gr7QLPbgBAN?utm_source=FB&utm_campaign={{campaign.name}}|{{campaign.id}}&utm_medium={{adset.name}}|{{adset.id}}&utm_content={{ad.name}}|{{ad.id}}&utm_term={{placement}}';
   };
 
   return (

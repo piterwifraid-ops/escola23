@@ -1,16 +1,17 @@
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { usePixelTracking } from '../hooks/usePixelTracking';
+import useUtmNavigator from '../hooks/useUtmNavigator';
 
 const Main: React.FC = () => {
 	usePixelTracking();
 	
-	const navigate = useNavigate();
+	const navigate = useUtmNavigator();
 	const location = useLocation();
 
 	const customNavigation = (route: string) => {
 		console.log("Navigating to:", route, "with search params:", location.search);
-		navigate(route + location.search);
+		navigate(route);
 	};
 
 	return (
@@ -99,7 +100,7 @@ const Main: React.FC = () => {
 						<div className="p-6 text-center">
 							<p className="text-red-600 font-medium mb-4">INSCREVA-SE AGORA! VAGAS LIMITADAS</p>
 							<button
-								onClick={() => customNavigation("/inscricao")}
+								onClick={() => customNavigation("/quiz")}
 								className="bg-[#1351B4] text-white py-2 px-12 rounded-full font-semibold hover:bg-[#1351B4]/90 transition-colors mb-4"
 							>
 									Fazer	Inscrição

