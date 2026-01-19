@@ -40,115 +40,180 @@ interface VerificationStep {
 	status: "pending" | "processing" | "completed";
 }
 
-// Configuração do Axios para evitar bloqueios de bot
-const mapClient = axios.create({
-  headers: {
-    // OSM exige User-Agent para não bloquear. Use o nome do seu app ou um genérico crível.
-    'User-Agent': 'AgenteEscolaApp/1.0',
-    'Accept-Language': 'pt-BR'
-  },
-  timeout: 8000 // 8 segundos de teto máximo (necessário para APIs públicas gratuitas)
-});
-
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-// Retry específico para chamadas de API instáveis
-const retryRequest = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
-  try {
-    return await fn();
-  } catch (err) {
-    if (retries <= 1) throw err;
-    console.log(`Tentativa falhou. Retentando em ${delay}ms... (${retries - 1} tentativas restantes)`);
-    await new Promise(resolve => setTimeout(resolve, delay));
-    return retryRequest(fn, retries - 1, delay);
-  }
-};
-
 const validateCEP = async (cep: string) => {
-  // 1. VIACEP (Rápido e Estável)
-  let addressData;
   try {
-    const { data } = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
-    if (data.erro) throw new Error("CEP não encontrado");
-    addressData = data;
-  } catch (e) {
-    throw new Error("Erro ao consultar CEP. Verifique os dígitos.");
-  }
+    // 1. Busca endereço na BrasilAPI (V2)
+    const brasilApiResponse = await axios.get(`https://brasilapi.com.br/api/cep/v2/${cep}`, {
+      timeout: 10000
+    });
 
-  try {
-    // 2. NOMINATIM (Geocodificação)
-    const addressString = `${addressData.logradouro}, ${addressData.localidade}, ${addressData.uf}, Brazil`;
+    if (!brasilApiResponse.data || !brasilApiResponse.data.street) {
+      throw new Error("CEP não encontrado ou incompleto");
+    }
 
-    const coords = await retryRequest(async () => {
-      const { data } = await mapClient.get(
-        `https://nominatim.openstreetmap.org/search`,
-        {
-          params: {
-            q: addressString,
-            format: 'json',
-            limit: 1
-          }
-        }
-      );
-      if (!data.length) throw new Error("Coordenadas não encontradas");
-      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-    }, 3, 500);
+    const { street, neighborhood, city, state, cep: cepFormatado } = brasilApiResponse.data;
 
-    // 3. OVERPASS API (Busca de Escolas Reais)
-    // QUERY OTIMIZADA: Busca APENAS nós (points), não caminhos/prédios
+    // Mapeamento: BrasilAPI (Inglês) -> Padrão ViaCEP (Português)
+    const addressData = {
+      logradouro: street,
+      bairro: neighborhood,
+      localidade: city,
+      uf: state,
+      cep: cepFormatado
+    };
+
+    // 2. Obter coordenadas via Nominatim
+    const addressQuery = `${addressData.logradouro}, ${addressData.localidade}, ${addressData.uf}, Brazil`;
+    const nominatimResponse = await axios.get(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressQuery)}`,
+      {
+        headers: {
+          'User-Agent': 'AgenteEscolaApp'
+        },
+        timeout: 10000
+      }
+    );
+
+    if (!nominatimResponse.data || nominatimResponse.data.length === 0) {
+      throw new Error("Localização não encontrada no mapa");
+    }
+
+    const { lat, lon } = nominatimResponse.data[0];
+
+    // 3. Buscar escolas usando Overpass API com filtros melhorados
+    // Busca apenas schools (não amenities genéricas)
     const overpassQuery = `
-      [out:json][timeout:5];
+      [out:json][timeout:25];
       (
-        node["amenity"="school"](around:3000,${coords.lat},${coords.lon});
+        node["amenity"="school"](around:10000,${lat},${lon});
+        way["amenity"="school"](around:10000,${lat},${lon});
+        relation["amenity"="school"](around:10000,${lat},${lon});
       );
-      out 10;
+      out center;
     `;
 
-    const schoolsData = await retryRequest(async () => {
-      const { data } = await mapClient.post(
-        'https://overpass-api.de/api/interpreter',
-        overpassQuery,
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
-      return data.elements;
-    }, 3, 1000);
-
-    // Processamento e Ordenação
-    let schools = schoolsData
-      .map((el: any) => ({
-        id: el.id.toString(),
-        name: el.tags.name || "Escola Municipal",
-        type: el.tags.operator || el.tags.school_type || "Escola Pública",
-        distance: calculateDistance(coords.lat, coords.lon, el.lat, el.lon)
-      }))
-      .filter((s: any) => s.name !== "Escola Municipal")
-      .sort((a: any, b: any) => a.distance - b.distance)
-      .slice(0, 3);
-
-    if (schools.length === 0) {
-      throw new Error("Nenhuma escola encontrada próxima a este endereço.");
+    let overpassResponse;
+    let retries = 0;
+    const maxRetries = 2;
+    
+    while (retries < maxRetries) {
+      try {
+        overpassResponse = await axios.post(
+          'https://overpass-api.de/api/interpreter',
+          overpassQuery,
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            timeout: 40000
+          }
+        );
+        break; // Sucesso, sair do loop
+      } catch (error) {
+        retries++;
+        if (retries >= maxRetries) {
+          throw new Error(`Overpass API indisponível após ${maxRetries} tentativas. ${error.message}`);
+        }
+        // Aguardar antes de tentar novamente
+        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+      }
     }
+
+    // Função para extrair coordenadas (node direto ou center de way/relation)
+    const getCoordinates = (element: any) => {
+      if (element.lat !== undefined && element.lon !== undefined) {
+        return { lat: element.lat, lon: element.lon };
+      }
+      if (element.center?.lat !== undefined && element.center?.lon !== undefined) {
+        return { lat: element.center.lat, lon: element.center.lon };
+      }
+      return null;
+    };
+
+    // Função para classificar e filtrar escolas (apenas públicas/estaduais)
+    const isPublicSchool = (element: any) => {
+      const name = (element.tags?.name || '').toLowerCase();
+      const operator = (element.tags?.operator || '').toLowerCase();
+      const operatorType = (element.tags?.['operator:type'] || '').toLowerCase();
+      const fee = element.tags?.fee;
+
+      // Excluir se for particular
+      if (operatorType === 'private' || name.includes('particular')) {
+        return false;
+      }
+
+      // Excluir se cobrar taxa
+      if (fee === 'yes') {
+        return false;
+      }
+
+      // Excluir autoescolas, cursos, academias
+      if (name.includes('autoescola') || name.includes('auto escola') || 
+          name.includes('cursos') || name.includes('academia') ||
+          name.includes('treinamento') || name.includes('centro de treinamento')) {
+        return false;
+      }
+
+      // Aceitar municipal, estadual ou pública padrão
+      return true;
+    };
+
+    // Função para classificar tipo de escola
+    const getSchoolType = (element: any) => {
+      const name = element.tags?.name || '';
+      const operator = element.tags?.operator || '';
+
+      if (name.includes('Estadual') || name.includes('E.E.') || operator.includes('Estadual')) {
+        return 'Escola Estadual';
+      }
+      if (name.includes('Municipal') || name.includes('E.M.') || operator.includes('Municipal')) {
+        return 'Escola Municipal';
+      }
+      return 'Escola Pública';
+    };
+
+    // Processar e filtrar escolas - apenas as 3 mais próximas
+    const schools = (overpassResponse.data.elements || [])
+      .filter(element => {
+        if (!element.tags || !element.tags.name) return false;
+        return isPublicSchool(element);
+      })
+      .map(element => {
+        const coords = getCoordinates(element);
+        if (!coords) return null;
+
+        return {
+          id: element.id.toString(),
+          name: element.tags.name,
+          type: getSchoolType(element),
+          distance: calculateDistance(lat, lon, coords.lat, coords.lon)
+        };
+      })
+      .filter(school => school !== null)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3);
 
     return {
       address: addressData,
-      schools: schools,
-      coordinates: coords
+      schools,
+      coordinates: { lat, lon }
     };
-
   } catch (error) {
-    console.error("Erro na busca de escolas:", error);
-    throw new Error("Não foi possível localizar as escolas próximas. Tente novamente.");
+    console.error('Erro ao buscar dados de localização:', error);
+    throw error;
   }
+};
+
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 };
 
 const validateCPFFromAPI = async (cpf: string): Promise<{ valid: boolean; data?: UserInfo }> => {
