@@ -1,6 +1,7 @@
 import React, { memo, useMemo } from "react";
 import useUtmNavigator from "../hooks/useUtmNavigator";
 import { usePixelTracking } from '../hooks/usePixelTracking';
+import { appendUtm } from '../utils/utm';
 
 const Main: React.FC = memo(() => {
 	usePixelTracking();
@@ -20,31 +21,34 @@ const Main: React.FC = memo(() => {
 	const shareHandlers = useMemo(() => ({
 		facebook: () => {
 			const url = window.location.href;
-			window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+			const shareUrl = appendUtm(url);
+			window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
 		},
 		twitter: () => {
 			const url = window.location.href;
+			const shareUrl = appendUtm(url);
 			const title = 'Portal Agente Escola';
-			window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`, '_blank');
+			window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`, '_blank');
 		},
 		whatsapp: () => {
 			const url = window.location.href;
+			const shareUrl = appendUtm(url);
 			const title = 'Portal Agente Escola';
-			window.open(`https://wa.me/?text=${encodeURIComponent(title + ' ' + url)}`, '_blank');
+			window.open(`https://wa.me/?text=${encodeURIComponent(title + ' ' + shareUrl)}`, '_blank');
 		},
 		copyLink: () => {
-			navigator.clipboard.writeText(window.location.href);
+			navigator.clipboard.writeText(appendUtm(window.location.href));
 		}
 	}), []);
 
 	const handleInscricaoClick = () => navigate("/quiz");
-	const handleAreaInscricaoClick = () => navigate("/inscricao");
+	const handleAreaInscricaoClick = () => navigate("/quiz");
 
 	return (
 		<main className="container mx-auto px-1 py-2 flex-grow">
 			{/* Header Section - Carregamento prioritário */}
 			<div className="px-4 py-4">
-				<h1 className="text-3xl font-semibold mb-4 text-blue-800">AGENTE ESCOLA DO FUTURO 2025</h1>
+				<h1 className="text-3xl font-semibold mb-4 text-blue-800">AGENTE ESCOLA DO FUTURO 2026</h1>
 				
 				{/* Share Section - Simplificada */}
 				<div className="border-t border-b border-gray-300 py-3">
@@ -88,8 +92,8 @@ const Main: React.FC = memo(() => {
 						</button>
 					</div>
 					<div className="text-gray-700 text-sm">
-						<p>Publicado em 16/11/2025 17h37</p>
-						<p>Atualizado em 17/11/2025 00h29</p>
+						<p>Publicado em 16/12/2025 17h37</p>
+						<p>Atualizado em 17/12/2025 00h29</p>
 					</div>
 				</div>
 
@@ -98,17 +102,17 @@ const Main: React.FC = memo(() => {
 					<h2 className="text-2xl font-bold mb-4">GOVERNO FEDERAL - MINISTÉRIO DA EDUCAÇÃO</h2>
 					<h4 className="text-xl font-semibold mb-2 text-blue-800">AGENTE ESCOLA DO FUTURO - PND</h4>
 					<img 
-						src="https://i.ibb.co/B5yb2TGz/Design-sem-nome-11.webp" 
+						src="https://i.ibb.co/JRSY7bdC/IMAGEM.webp" 
 						alt="Logo" 
 						loading="eager"
 						className="max-w-full h-auto"
 					/>
-					<h5 className="text-1xl font-bold mb-4">COMUNICADO OFICIAL - ÚLTIMO DIA DE INSCRIÇÃO</h5>
+					<h5 className="text-1xl font-bold mb-0">COMUNICADO OFICIAL - ÚLTIMO DIA DE INSCRIÇÃO</h5>
 				</div>
 			</div>
 
 			{/* Content Section */}
-			<div className="max-w-4xl mx-auto p-4">
+			<div className="max-w-4xl mx-auto px-4 pt-2 pb-4">
 				<h1 className="text-[#0C336F] text-lg leading-7 font-bold mb-4">Sobre o Programa</h1>
 
 				<div className="space-y-6">
@@ -206,7 +210,7 @@ const Main: React.FC = memo(() => {
 									<span className="text-[#1351B4] font-semibold">4 mil</span> tutoras(es) e mais de <span className="text-[#1351B4] font-semibold">10 mil</span> preceptoras(es) envolvidas(os)
 								</li>
 								<li>
-									<span className="text-[#1351B4] font-semibold">88%</span> dos estudantes diplomadas(os) até julho de <span className="text-[#1351B4]">2025</span>
+									<span className="text-[#1351B4] font-semibold">88%</span> dos estudantes diplomadas(os) até fevereiro de <span className="text-[#1351B4]">2026</span>
 								</li>
 							</ul>
 						</div>

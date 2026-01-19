@@ -1,11 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import useUtmNavigator from '../hooks/useUtmNavigator';
+import { appendUtm } from '../utils/utm';
 import { usePixelTracking } from '../hooks/usePixelTracking';
 
 const Upsell4: React.FC = () => {
   usePixelTracking();
   
-  const navigate = useUtmNavigator();
+  // useUtmNavigator available if needed for future navigation
+
+  const [inscriptionDate, setInscriptionDate] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const key = 'firstAccessTimestamp';
+      let ts = localStorage.getItem(key);
+      if (!ts) {
+        ts = new Date().toISOString();
+        localStorage.setItem(key, ts);
+      }
+
+      const d = new Date(ts);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+
+      setInscriptionDate(`${day}/${month}/${year}, ${hours}:${minutes}`);
+    } catch (e) {
+      // fallback to current formatted date
+      const d = new Date();
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      setInscriptionDate(`${day}/${month}/${year}, ${hours}:${minutes}`);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 flex items-center justify-center">
@@ -29,7 +61,7 @@ const Upsell4: React.FC = () => {
             <div className="md:w-1/2 w-full mt-4 md:mt-0">
               <div className="mb-3">
                 <div className="text-xs text-gray-500 uppercase">DATA DE INSCRIÇÃO</div>
-                <div className="text-base text-gray-800">01/12/2025, 16:05</div>
+                <div className="text-base text-gray-800">{inscriptionDate || '—'}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-500 uppercase">STATUS</div>
@@ -56,13 +88,13 @@ const Upsell4: React.FC = () => {
             <div className="text-3xl">📅</div>
             <div>
               <p className="m-0"><strong className="text-[#0C336F]">Prazos:</strong></p>
-              <p className="m-0">As análises ocorrerão até o dia 16 de Janeiro. <strong>Os candidatos selecionados para a próxima etapa serão comunicados por e-mail e/ou telefone.</strong></p>
+              <p className="m-0">As análises ocorrerão até o dia 16 de Março. <strong>Os candidatos selecionados para a próxima etapa serão comunicados por e-mail e/ou telefone.</strong></p>
             </div>
           </div>
         </div>
 
         <div className="mt-6 pt-6 border-t">
-          <a href="https://www.gov.br/servidor/pt-br/central-de-conteudo/oportunidades/divulgacao" className="inline-block bg-[#1351B4] hover:bg-[#0C336F] text-white py-3 px-6 rounded-md font-semibold">FINALIZAR</a>
+          <a href={appendUtm('https://www.gov.br/servidor/pt-br/central-de-conteudo/oportunidades/divulgacao')} className="inline-block bg-[#1351B4] hover:bg-[#0C336F] text-white py-3 px-6 rounded-md font-semibold">FINALIZAR</a>
          
         </div>
       </div>

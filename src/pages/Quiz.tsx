@@ -58,17 +58,17 @@ const Quiz: React.FC = () => {
 	};
 
 	return (
-		<main className="container mx-auto px-4 py-8 flex-grow">
-			<div className="max-w-3xl mx-auto">
-				<div className="mb-8">
-					<h1 className="text-[#1351B4] text-3xl font-bold mb-2">Pesquisa de Satisfação</h1>
+		<main className="container mx-auto px-4 py-6 flex-grow">
+			<div className="max-w-xl md:max-w-3xl mx-auto">
+				<div className="mb-6">
+					<h1 className="text-[#1351B4] text-2xl md:text-3xl font-bold mb-2">Pesquisa de Satisfação</h1>
 					<div className="h-1 w-24 bg-green-500"></div>
 				</div>
 
-				<div className="bg-white rounded-lg p-8 shadow-sm">
+				<div className="bg-white rounded-lg p-6 md:p-8 shadow-sm">
 					<div className="mb-6">
-						<div className="flex justify-between items-center mb-4">
-							<span className="text-sm text-gray-500">
+						<div className="flex justify-between items-center mb-3">
+							<span className="text-xs md:text-sm text-gray-500">
 								Questão {currentQuestion + 1} de {questions.length}
 							</span>
 							<div className="flex gap-1">
@@ -87,16 +87,16 @@ const Quiz: React.FC = () => {
 							</div>
 						</div>
 
-						<div className="space-y-6">
-							<div className="bg-gray-50 p-6 rounded-lg">
-								<h2 className="text-xl font-semibold text-[#1351B4] mb-4">
+						<div className="space-y-4 md:space-y-6">
+							<div className="bg-gray-50 p-4 md:p-6 rounded-lg">
+								<h2 className="text-lg md:text-xl font-semibold text-[#1351B4] mb-3">
 									{questions[currentQuestion].question}
 								</h2>
 
 								<img
 									src={questions[currentQuestion].image}
 									alt={questions[currentQuestion].imageAlt}
-									className="w-full rounded-lg"
+									className="w-full rounded-lg max-h-48 md:max-h-64 object-cover"
 								/>
 							</div>
 
@@ -105,25 +105,25 @@ const Quiz: React.FC = () => {
 									<button
 										key={index}
 										onClick={() => handleAnswer(currentQuestion, index)}
-										className={`w-full p-4 rounded-lg border-2 text-left transition-colors ${
+										className={`w-full p-3 md:p-4 rounded-lg border-2 text-left transition-colors ${
 											answers[currentQuestion] === index
 												? "border-[#1351B4] bg-blue-50"
 												: "border-gray-200 hover:border-gray-300"
 										}`}
 									>
-										<div className="flex items-center gap-3">
+										<div className="flex items-center gap-2 md:gap-3">
 											<div
-												className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-													answers[currentQuestion] === index
-														? "border-[#1351B4] bg-[#1351B4]"
-														: "border-gray-300"
+												className={`w-4 h-4 md:w-5 md:h-5 rounded-full border-2 flex items-center justify-center ${
+												answers[currentQuestion] === index
+													? "border-[#1351B4] bg-[#1351B4]"
+													: "border-gray-300"
 												}`}
 											>
 												{answers[currentQuestion] === index && (
-													<CheckCircle size={14} className="text-white" />
+													<CheckCircle size={12} className="text-white" />
 												)}
 											</div>
-											<span>{option}</span>
+											<span className="text-sm md:text-base">{option}</span>
 										</div>
 									</button>
 								))}
@@ -131,23 +131,23 @@ const Quiz: React.FC = () => {
 						</div>
 					</div>
 
-					<div className="flex justify-between mt-8">
+					<div className="flex justify-between mt-6">
 						<button
 							onClick={() => handleNavigation("prev")}
 							disabled={currentQuestion === 0}
-							className="flex items-center gap-2 px-6 py-3 rounded-lg text-[#1351B4] disabled:opacity-50 disabled:cursor-not-allowed"
+							className="flex items-center gap-2 px-4 py-2 md:px-6 md:py-3 rounded-lg text-[#1351B4] disabled:opacity-50 disabled:cursor-not-allowed"
 						>
-							<ArrowLeft size={20} />
+							<ArrowLeft size={18} />
 							<span>Anterior</span>
 						</button>
 
 						<button
 							onClick={() => handleNavigation("next")}
 							disabled={!hasAnsweredCurrent}
-							className="flex items-center gap-2 px-6 py-3 rounded-lg bg-[#1351B4] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+							className="flex items-center gap-2 px-4 py-2 md:px-6 md:py-3 rounded-lg bg-[#1351B4] text-white disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							<span>{isLastQuestion ? "Finalizar" : "Próxima"}</span>
-							<ArrowRight size={20} />
+							<ArrowRight size={18} />
 						</button>
 					</div>
 				</div>
